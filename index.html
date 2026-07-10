@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧課堂互動與積分系統</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans antialiased text-slate-800">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">🎓</span>
+                <h1 class="text-lg font-bold text-slate-900 tracking-tight">智慧課堂互動系統</h1>
+            </div>
+            <div id="connection-status" class="text-xs font-medium text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-pulse">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> 雲端連線中...
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="lg:col-span-2 space-y-6">
+            
+            <div id="teacher-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 hidden">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-1.5">⚡ 題目與模式控制台</h2>
+                    <span class="text-xs bg-indigo-50 text-indigo-600 font-semibold px-2.5 py-1 rounded-md">教師端</span>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <button id="mode-buzz" class="py-2.5 rounded-xl font-medium border text-sm transition cursor-pointer bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs">純搶答模式</button>
+                    <button id="mode-single" class="py-2.5 rounded-xl font-medium border text-sm transition cursor-pointer border-slate-200 text-slate-600 hover:bg-slate-50">4選1選擇題</button>
+                    <button id="mode-short" class="py-2.5 rounded-xl font-medium border text-sm transition cursor-pointer border-slate-200 text-slate-600 hover:bg-slate-50">短答/問答題</button>
+                </div>
+
+                <div id="answer-setting-box" class="bg-slate-50 rounded-xl p-4 border border-slate-100 hidden">
+                    <div id="set-single-box" class="space-y-2 hidden">
+                        <label class="block text-xs font-bold text-slate-500">設定本題正確答案：</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button data-ans="A" class="ans-set-btn py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:border-indigo-500 transition cursor-pointer">A</button>
+                            <button data-ans="B" class="ans-set-btn py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:border-indigo-500 transition cursor-pointer">B</button>
+                            <button data-ans="C" class="ans-set-btn py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:border-indigo-500 transition cursor-pointer">C</button>
+                            <button data-ans="D" class="ans-set-btn py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:border-indigo-500 transition cursor-pointer">D</button>
+                        </div>
+                    </div>
+                    <div id="set-short-box" class="space-y-2 hidden">
+                        <label class="block text-xs font-bold text-slate-500">設定自動加分關鍵字 (多個請用逗號隔開)：</label>
+                        <input type="text" id="correct-keyword" placeholder="例如：台灣, 福爾摩沙" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-indigo-500">
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="start-round-btn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition shadow-sm cursor-pointer">
+                        🚀 開始本題答題 / 開放搶答
+                    </button>
+                </div>
+            </div>
+
+            <div id="student-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 hidden">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <h2 class="text-base font-bold text-slate-900">✏️ 學生作答區</h2>
+                    <span id="student-name-tag" class="text-xs bg-slate-100 text-slate-600 font-medium px-2.5 py-1 rounded-md">載入中...</span>
+                </div>
+
+                <div id="student-interface" class="min-h-[160px] flex flex-col justify-center items-center">
+                    <p class="text-slate-400 text-sm">等待老師開始題目...</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        ⏱️ 本題作答動態 <span class="text-xs font-normal text-slate-400">(依時間先後排序)</span>
+                    </h2>
+                    <span id="current-mode-badge" class="text-xs bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-sm">純搶答</span>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="text-slate-400 border-b border-slate-100">
+                                <th class="pb-2 font-medium">時間</th>
+                                <th class="pb-2 font-medium">學生姓名</th>
+                                <th class="pb-2 font-medium">作答內容</th>
+                                <th class="pb-2 font-medium text-right" id="th-action">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="response-list" class="divide-y divide-slate-50">
+                            <tr>
+                                <td colspan="4" class="py-8 text-center text-slate-400 text-xs">目前尚無作答紀錄</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="space-y-6">
+            
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-1.5">🏆 班級累計積分榜</h2>
+                    <button id="sort-leaderboard-btn" class="text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-medium px-2.5 py-1 rounded-md transition cursor-pointer">
+                        📊 依總分排序
+                    </button>
+                </div>
+                <ol id="leaderboard" class="space-y-2 max-h-[280px] overflow-y-auto pr-1 divide-y divide-slate-50">
+                    <p class="text-slate-400 text-xs text-center py-4">尚無同學登錄積分</p>
+                </ol>
+            </div>
+
+            <div id="teacher-qrcode-box" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 text-center space-y-4 hidden">
+                <p class="text-xs font-bold text-slate-400 tracking-wider uppercase">學生手機掃描加入教室</p>
+                <div class="flex justify-center">
+                    <div id="qrcode" class="p-3 bg-white rounded-xl shadow-inner border border-slate-100"></div>
+                </div>
+                <p id="room-url" class="text-[10px] text-slate-400 break-all select-all hover:text-indigo-600 transition cursor-pointer"></p>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <script>
+        // 初始化雲端資料庫設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyB9E_s5Y_f8rhEdusuULFR1xMqsJL7WSo8",
+            authDomain: "buzzer-15176.firebaseapp.com",
+            databaseURL: "https://buzzer-15176-default-rtdb.firebaseio.com",
+            projectId: "buzzer-15176",
+            storageBucket: "buzzer-15176.firebasestorage.app",
+            messagingSenderId: "140827507972",
+            appId: "1:140827507972:web:525b30620d77b0d3aa6451"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
+        // 雲端節點配置
+        const roomRef = database.ref('quizRoom');
+        const responsesRef = database.ref('roomResponses');
+        const scoresRef = database.ref('roomScores');
+
+        let currentRole = 'teacher';
+        let studentName = '';
+        let selectedMode = 'buzz'; 
+        let teacherSetAnswer = ''; 
+
+        // 檢查網址參數決定身分
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('role') === 'student') {
+            currentRole = 'student';
+        }
+
+        // 監聽網路連線狀態
+        database.ref('.info/connected').on('value', (snapshot) => {
+            const statusEl = document.getElementById('connection-status');
+            if (snapshot.val() === true) {
+                statusEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 雲端連線正常';
+                statusEl.className = "text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full flex items-center gap-1.5";
+                initApp();
+            }
+        });
+
+        function initApp() {
+            setupQRandUrl();
+            
+            if (currentRole === 'teacher') {
+                document.getElementById('teacher-panel').classList.remove('hidden');
+                document.getElementById('teacher-qrcode-box').classList.remove('hidden');
+                document.getElementById('th-action').classList.remove('hidden');
+                setupTeacherLogic();
+            } else {
+                document.getElementById('student-panel').classList.remove('hidden');
+                document.getElementById('th-action').classList.add('hidden'); // 學生不顯示加分鈕
+                setupStudentLogic();
+            }
+
+            // 雙方同步監聽：本題作答動態（排序）與積分榜
+            listenToResponses();
+            listenToLeaderboard(false); // 預設依名字排
+        }
+
+        // 產生 QR Code 與加入網址
+        function setupQRandUrl() {
+            const currentUrl = window.location.href.split('?')[0];
+            const studentUrl = currentUrl + "?role=student";
+            document.getElementById('room-url').innerText = studentUrl;
+            
+            document.getElementById("qrcode").innerHTML = "";
+            new QRCode(document.getElementById("qrcode"), {
+                text: studentUrl,
+                width: 130,
+                height: 130,
+                colorDark : "#0f172a",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        }
+
+        /* ==========================================================================
+           👨‍🏫 老師端控制邏輯
+           ========================================================================== */
+        function setupTeacherLogic() {
+            const mBuzz = document.getElementById('mode-buzz');
+            const mSingle = document.getElementById('mode-single');
+            const mShort = document.getElementById('mode-short');
+            const settingBox = document.getElementById('answer-setting-box');
+            const boxSingle = document.getElementById('set-single-box');
+            const boxShort = document.getElementById('set-short-box');
+
+            // 模式切換鈕點擊事件
+            mBuzz.onclick = () => { updateModeUI('buzz'); };
+            mSingle.onclick = () => { updateModeUI('single'); };
+            mShort.onclick = () => { updateModeUI('short'); };
+
+            function updateModeUI(mode) {
+                selectedMode = mode;
+                teacherSetAnswer = '';
+                
+                // 重設按鈕樣式
+                [mBuzz, mSingle, mShort].forEach(btn => btn.className = "py-2.5 rounded-xl font-medium border text-sm transition cursor-pointer border-slate-200 text-slate-600 hover:bg-slate-50");
+                document.querySelectorAll('.ans-set-btn').forEach(b => b.className = "ans-set-btn py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:border-indigo-500 transition cursor-pointer");
+
+                if (mode === 'buzz') {
+                    mBuzz.className = "py-2.5 rounded-xl font-medium border text-sm transition cursor-pointer bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs";
+                    settingBox.classList.add('hidden');
+                } else if (mode === 'single') {
+                    mSingle.className = "py-2.5 rounded-xl font-medium border text-sm transition cursor-pointer bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs";
+                    settingBox.classList.remove('hidden');
+                    boxSingle.classList.remove('hidden');
+                    boxShort.classList.add('hidden');
+                } else if (mode === 'short') {
+                    mShort.className = "py-2.5 rounded-xl font-medium border text-sm transition cursor-pointer bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs";
+                    settingBox.classList.remove('hidden');
+                    boxSingle.classList.add('hidden');
+                    boxShort.classList.remove('hidden');
+                }
+            }
+
+            // 選擇題正確答案選取
+            document.querySelectorAll('.ans-set-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.ans-set-btn').forEach(b => b.className = "ans-set-btn py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:border-indigo-500 transition cursor-pointer");
+                    btn.className = "ans-set-btn py-2 bg-indigo-600 border border-indigo-600 text-white font-semibold rounded-lg text-sm transition cursor-pointer";
+                    teacherSetAnswer = btn.getAttribute('data-ans');
+                };
+            });
+
+            // 開始新一題
+            document.getElementById('start-round-btn').onclick = () => {
+                if (selectedMode === 'short') {
+                    teacherSetAnswer = document.getElementById('correct-keyword').value.trim();
+                }
+
+                // 清空上一題作答，寫入新題目設定
+                responsesRef.remove();
+                roomRef.set({
+                    status: "open",
+                    mode: selectedMode,
+                    correctAnswer: teacherSetAnswer,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+                alert(`已成功開啟【${document.getElementById('current-mode-badge').innerText}】新題目！`);
+            };
+
+            // 點擊總分排序排行榜
+            document.getElementById('sort-leaderboard-btn').onclick = () => {
+                listenToLeaderboard(true);
+            };
+        }
+
+        /* ==========================================================================
+           🧑‍🎓 學生端作答邏輯
+           ========================================================================== */
+        function setupStudentLogic() {
+            studentName = localStorage.getItem('student_name_v2');
+            if (!studentName) {
+                studentName = prompt("請輸入您的班級座號與姓名 (例如: 30105張小明):") || "匿名同學_" + Math.floor(Math.random()*1000);
+                localStorage.setItem('student_name_v2', studentName);
+            }
+            document.getElementById('student-name-tag').innerText = studentName;
+            
+            // 初次進入時在積分表註冊，確保出現在排行榜上
+            scoresRef.child(studentName).transaction((curr) => curr || 0);
+
+            // 監聽老師開題狀態，切換對應的作答畫面
+            roomRef.on('value', (snapshot) => {
+                const room = snapshot.val();
+                const container = document.getElementById('student-interface');
+                
+                if (!room || room.status !== 'open') {
+                    container.innerHTML = `<p class="text-slate-400 text-sm">🛑 答題尚未開放，等待老師開始...</p>`;
+                    return;
+                }
+
+                // 檢查自己是不是已經回答過這題了
+                responsesRef.child(studentName).once('value', (resSnap) => {
+                    if (resSnap.exists()) {
+                        container.innerHTML = `<div class="text-emerald-600 font-bold text-center">✓ 您的解答已成功送出！<br><span class="text-xs text-slate-400 font-normal">正在等待老師對答案或進入下一題</span></div>`;
+                        return;
+                    }
+
+                    // 依據題目型態渲染不同介面
+                    if (room.mode === 'buzz') {
+                        container.innerHTML = `
+                            <button id="btn-submit-buzz" class="w-28 h-28 bg-red-500 hover:bg-red-600 active:scale-95 text-white font-black text-xl rounded-full shadow-md transition flex items-center justify-center cursor-pointer">
+                                搶答！
+                            </button>`;
+                        document.getElementById('btn-submit-buzz').onclick = () => { submitAnswer('搶答成功'); };
+                    } 
+                    else if (room.mode === 'single') {
+                        container.innerHTML = `
+                            <div class="w-full space-y-3">
+                                <p class="text-xs font-bold text-slate-400 text-left">請選擇您的答案：</p>
+                                <div class="grid grid-cols-2 gap-3 w-full">
+                                    <button onclick="submitAnswer('A')" class="py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-500 transition cursor-pointer">A</button>
+                                    <button onclick="submitAnswer('B')" class="py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-500 transition cursor-pointer">B</button>
+                                    <button onclick="submitAnswer('C')" class="py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-500 transition cursor-pointer">C</button>
+                                    <button onclick="submitAnswer('D')" class="py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-500 transition cursor-pointer">D</button>
+                                </div>
+                            </div>`;
+                    } 
+                    else if (room.mode === 'short') {
+                        container.innerHTML = `
+                            <div class="w-full space-y-3">
+                                <p class="text-xs font-bold text-slate-400 text-left">請輸入您的簡答：</p>
+                                <div class="flex gap-2">
+                                    <input type="text" id="input-short" placeholder="請在此輸入答案..." class="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-indigo-500">
+                                    <button id="btn-submit-short" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 rounded-xl text-sm transition cursor-pointer">送出</button>
+                                </div>
+                            </div>`;
+                        document.getElementById('btn-submit-short').onclick = () => {
+                            const val = document.getElementById('input-short').value.trim();
+                            if(!val) return alert('請先輸入答案！');
+                            submitAnswer(val);
+                        };
+                    }
+                });
+            });
+        }
+
+        // 學生送出答案核心（毫秒排他鎖機制）
+        function submitAnswer(answerContent) {
+            responsesRef.child(studentName).transaction((currentData) => {
+                if (currentData === null) {
+                    return {
+                        name: studentName,
+                        answer: answerContent,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    };
+                }
+                return; // 若已存在表示已作答，不變更
+            }, (error, committed, snapshot) => {
+                if (committed) {
+                    // 自動對答案加分邏輯
+                    roomRef.once('value', (roomSnap) => {
+                        const room = roomSnap.val();
+                        if (room && room.correctAnswer) {
+                            let isCorrect = false;
+                            
+                            if (room.mode === 'single' && answerContent.toUpperCase() === room.correctAnswer.toUpperCase()) {
+                                isCorrect = true;
+                            } else if (room.mode === 'short') {
+                                // 支援多關鍵字比對 (逗號分開)
+                                const keywords = room.correctAnswer.split(/[,，]/).map(k => k.trim().toLowerCase());
+                                isCorrect = keywords.some(kw => kw && answerContent.toLowerCase().includes(kw));
+                            }
+
+                            if (isCorrect) {
+                                // 符合設定，雲端自動累加一分
+                                scoresRef.child(studentName).transaction(score => (score || 0) + 1);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        /* ==========================================================================
+           📊 雙端共用：作答即時排序與成績單處理
+           ========================================================================== */
+        
+        // 1. 監聽本題作答動態（依時間毫秒排序）
+        function listenToResponses() {
+            roomRef.on('value', (snap) => {
+                const room = snap.val();
+                const badge = document.getElementById('current-mode-badge');
+                if (room) {
+                    if(room.mode === 'buzz') badge.innerText = "純搶答";
+                    if(room.mode === 'single') badge.innerText = `選擇題 (正解: ${room.correctAnswer || '未設'})`;
+                    if(room.mode === 'short') badge.innerText = `問答題 (關鍵字: ${room.correctAnswer || '未設'})`;
+                }
+            });
+
+            responsesRef.orderByChild('timestamp').on('value', (snapshot) => {
+                const tbody = document.getElementById('response-list');
+                tbody.innerHTML = '';
+
+                if (!snapshot.exists()) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-400 text-xs">目前尚無作答紀錄</td></tr>`;
+                    return;
+                }
+
+                let index = 1;
+                snapshot.forEach((child) => {
+                    const data = child.val();
+                    const timeStr = new Date(data.timestamp).toLocaleTimeString();
+                    
+                    const tr = document.createElement('tr');
+                    tr.className = "text-slate-600 hover:bg-slate-50 transition";
+                    
+                    // 建立逐一手動加分按鈕 (僅限老師端顯示)
+                    const actionTd = currentRole === 'teacher' 
+                        ? `<td class="py-3 text-right"><button onclick="adjustScore('${data.name}', 1)" class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2 py-1 rounded border border-indigo-100 font-medium transition cursor-pointer">+1 分</button></td>`
+                        : `<td class="hidden"></td>`;
+
+                    // 排行序號標誌
+                    const rankBadge = index === 1 ? '🥇 ' : (index === 2 ? '🥈 ' : (index === 3 ? '🥉 ' : `${index}. `));
+
+                    tr.innerHTML = `
+                        <td class="py-3 text-xs text-slate-400 font-mono">${timeStr}</td>
+                        <td class="py-3 font-semibold text-slate-900">${rankBadge}${data.name}</td>
+                        <td class="py-3"><span class="bg-slate-100 px-2 py-1 rounded text-xs font-mono">${data.answer}</span></td>
+                        ${actionTd}
+                    `;
+                    tbody.appendChild(tr);
+                    index++;
+                });
+            });
+        }
+
+        // 2. 手動調整或增減分數路徑
+        window.adjustScore = function(name, amount) {
+            scoresRef.child(name).transaction(score => (score || 0) + amount);
+        };
+
+        // 3. 監聽與渲染班級積分榜
+        function listenToLeaderboard(sortByScore = false) {
+            scoresRef.on('value', (snapshot) => {
+                const listContainer = document.getElementById('leaderboard');
+                listContainer.innerHTML = '';
+
+                if (!snapshot.exists()) {
+                    listContainer.innerHTML = `<p class="text-slate-400 text-xs text-center py-4">尚無同學登錄積分</p>`;
+                    return;
+                }
+
+                let students = [];
+                snapshot.forEach((child) => {
+                    students.push({ name: child.key, score: child.val() });
+                });
+
+                // 排行榜排序邏輯
+                if (sortByScore) {
+                    // 依分數從高到低排
+                    students.sort((a, b) => b.score - a.score);
+                    document.getElementById('sort-leaderboard-btn').className = "text-xs bg-emerald-600 text-white font-medium px-2.5 py-1 rounded-md shadow-sm";
+                } else {
+                    // 預設依座號/名字排序 (按按鈕可切換總分排序)
+                    students.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
+                    document.getElementById('sort-leaderboard-btn').className = "text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-medium px-2.5 py-1 rounded-md transition cursor-pointer";
+                }
+
+                students.forEach((student, idx) => {
+                    const li = document.createElement('li');
+                    li.className = "flex items-center justify-between py-2.5 text-sm";
+                    
+                    // 老師版多出一個可隨時微調或倒扣的清除與扣分面板
+                    const teacherOpt = currentRole === 'teacher'
+                        ? `<div class="flex items-center gap-1">
+                                <button onclick="adjustScore('${student.name}', -1)" class="text-[10px] text-slate-400 hover:text-red-500 px-1 font-mono">-</button>
+                                <button onclick="adjustScore('${student.name}', 1)" class="text-[10px] text-slate-400 hover:text-emerald-500 px-1 font-mono">+</button>
+                           </div>`
+                        : '';
+
+                    li.innerHTML = `
+                        <div class="flex items-center gap-2 truncate">
+                            <span class="w-5 text-xs text-slate-400 font-mono text-center">${idx + 1}</span>
+                            <span class="font-medium text-slate-800 truncate">${student.name}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="font-bold text-indigo-600 font-mono bg-indigo-50/60 px-2 py-0.5 rounded">${student.score} 分</span>
+                            ${teacherOpt}
+                        </div>
+                    `;
+                    listContainer.appendChild(li);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
