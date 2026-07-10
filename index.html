@@ -57,22 +57,21 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <script>
-        // 您的專屬 Firebase 雲端金鑰設定
+        // 已補上精準的 databaseURL 雲端路徑
         const firebaseConfig = {
             apiKey: "AIzaSyB9E_s5Y_f8rhEdusuULFR1xMqsJL7WSo8",
             authDomain: "buzzer-15176.firebaseapp.com",
+            databaseURL: "https://buzzer-15176-default-rtdb.firebaseio.com",
             projectId: "buzzer-15176",
             storageBucket: "buzzer-15176.firebasestorage.app",
             messagingSenderId: "140827507972",
             appId: "1:140827507972:web:525b30620d77b0d3aa6451"
         };
 
-        // 初始化 Firebase
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
         const buzzerRef = database.ref('currentBuzzer');
 
-        // 取得網頁元件
         const statusEl = document.getElementById('connection-status');
         const mainPanelEl = document.getElementById('main-panel');
         const displayEl = document.getElementById('buzzer-display');
@@ -81,13 +80,11 @@
         const qrcodeAreaEl = document.getElementById('qrcode-area');
         const roomUrlEl = document.getElementById('room-url');
 
-        // 檢查連線狀態
         database.ref('.info/connected').on('value', (snapshot) => {
             if (snapshot.val() === true) {
                 statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span>雲端伺服器已同步連線';
                 statusEl.className = "text-sm font-medium text-emerald-600 flex items-center justify-center gap-1.5";
                 
-                // 顯示主介面與產生 QR Code
                 mainPanelEl.classList.remove('hidden');
                 controlActionsEl.classList.remove('hidden');
                 qrcodeAreaEl.classList.remove('hidden');
@@ -98,39 +95,31 @@
             }
         });
 
-        // 設定搶答房間
         function setupQuizRoom() {
-            // 自動偵測目前網址，動態附加上學生端的參數（假設同一個網頁透過參數切換學生端）
             const currentUrl = window.location.href.split('?')[0];
             const studentUrl = currentUrl + "?role=student";
-            
             roomUrlEl.innerText = studentUrl;
             
-            // 清除舊的 QR Code 並重新繪製
             document.getElementById("qrcode").innerHTML = "";
             new QRCode(document.getElementById("qrcode"), {
                 text: studentUrl,
-                width: 140
+                width: 140,
                 height: 140,
                 colorDark : "#1e1b4b",
                 colorLight : "#ffffff",
                 correctLevel : QRCode.CorrectLevel.H
             });
 
-            // 檢查 URL 參數判定是老師端還是學生端
             const urlParams = new URLSearchParams(window.location.search);
             const role = urlParams.get('role');
 
             if (role === 'student') {
-                // 如果是學生端
                 setupStudentInterface();
             } else {
-                // 如果是老師端
                 setupTeacherInterface();
             }
         }
 
-        // 老師端邏輯：監聽誰先搶答
         function setupTeacherInterface() {
             buzzerRef.on('value', (snapshot) => {
                 const data = snapshot.val();
@@ -147,21 +136,17 @@
                 }
             });
 
-            // 老師按鈕重置
             resetBtn.addEventListener('click', () => {
-                // 設為 "open" 代表開放搶答，且清空使用者
                 buzzerRef.set({ user: null, status: "open", timestamp: firebase.database.ServerValue.TIMESTAMP });
                 displayEl.innerHTML = `<span class="text-indigo-600 animate-pulse font-semibold text-2xl block">🟢 搶答中！</span><span class="text-xs text-slate-400 block mt-1">等待學生按下按鈕...</span>`;
                 mainPanelEl.className = "bg-indigo-50/50 rounded-2xl p-6 border border-indigo-100 min-h-[160px] flex flex-col justify-center";
             });
         }
 
-        // 學生端邏輯
         function setupStudentInterface() {
-            qrcodeAreaEl.classList.add('hidden'); // 學生不需要看 QR Code
-            controlActionsEl.classList.add('hidden'); // 學生不需要控制按鈕
+            qrcodeAreaEl.classList.add('hidden');
+            controlActionsEl.classList.add('hidden');
             
-            // 讓學生輸入姓名
             let studentName = localStorage.getItem('student_name');
             if (!studentName) {
                 studentName = prompt("請輸入您的座號與姓名 (例如: 05張小明):") || "匿名同學_" + Math.floor(Math.random()*1000);
@@ -178,4 +163,8 @@
             setTimeout(() => {
                 const pressBtn = document.getElementById('press-buzzer-btn');
                 
-                // 監聽搶答狀態變
+                buzzerRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (!data || data.status !== 'open') {
+                        pressBtn.disabled = true;
+                        pressBtn.className = "w-32 h-32 mx-auto bg-slate-300 text-slate-400 font-bold text
