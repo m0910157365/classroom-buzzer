@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧課堂互動與積分系統 - 課堂優化版</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans antialiased text-slate-800">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">🎓</span>
+                <h1 class="text-lg font-bold text-slate-900 tracking-tight">智慧課堂互動系統</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="view-history-btn" class="hidden bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer">
+                    📊 歷史作答與歷程紀錄
+                </button>
+                <button id="end-class-btn" class="hidden bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer">
+                    🛑 結束課堂 (重置報到)
+                </button>
+                <div id="connection-status" class="text-xs font-medium text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-pulse">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> 雲端連線中...
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="lobby-screen" class="max-w-4xl mx-auto p-4 md:p-6 my-4 md:my-8 space-y-6 hidden">
+        
+        <div class="text-center space-y-2 bg-gradient-to-b from-indigo-50 to-transparent p-6 rounded-2xl">
+            <h2 class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-2">
+                <span>✨</span> 歡迎加入智慧互動課堂 <span>✨</span>
+            </h2>
+            <p class="text-sm text-slate-500">請完成個人資訊登錄以參與課堂互動積分</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            
+            <div class="md:col-span-5 bg-white p-6 rounded-2xl shadow-md border border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
+                
+                <div id="teacher-qr-view" class="space-y-4 w-full">
+                    <p class="text-sm font-bold text-slate-700">📱 請拿出手機掃描加入</p>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-center shadow-inner">
+                        <div id="lobby-qrcode"></div>
+                    </div>
+                    <p class="text-xs text-slate-400">大螢幕專用投影連線碼</p>
+                </div>
+
+                <div id="student-signin-view" class="hidden w-full space-y-4 text-left">
+                    <div class="border-b border-slate-100 pb-2">
+                        <h3 class="font-bold text-indigo-600 flex items-center gap-1">📝 填寫成員報到資料</h3>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">🔢 座號 (例如：05, 12)</label>
+                            <input type="number" id="student-input-no" min="1" max="99" placeholder="請輸入兩位數座號" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">👤 姓名</label>
+                            <input type="text" id="student-input-name" placeholder="請輸入真實姓名" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition">
+                        </div>
+                        <button id="student-join-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition shadow-md cursor-pointer text-center text-sm flex items-center justify-center gap-1">
+                            🚀 確認登錄並加入教室
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="md:col-span-7 bg-white p-6 rounded-2xl shadow-md border border-slate-200 space-y-4">
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-3">
+                        <div class="flex flex-col">
+                            <span class="text-sm font-bold text-slate-700 flex items-center gap-1.5">👥 班級在線報到名單</span>
+                            <span id="teacher-kick-hint" class="text-[11px] text-slate-400 hidden">(老師可點擊 ❌ 刪除名稱不當的成員)</span>
+                        </div>
+                        <div>
+                            <span id="lobby-count" class="text-xs font-bold bg-indigo-600 text-white px-2.5 py-1 rounded-full whitespace-nowrap">0 人已加入</span>
+                        </div>
+                    </div>
+                    <div id="lobby-student-list" class="flex flex-wrap gap-2 max-h-[220px] overflow-y-auto content-start p-1 bg-white border border-slate-100 rounded-lg shadow-inner min-h-[120px]">
+                        <p class="text-slate-400 text-xs w-full text-center py-8">等待同學加入中...</p>
+                    </div>
+                </div>
+                
+                <div id="teacher-lobby-controls" class="grid grid-cols-1 sm:grid-cols-3 gap-3 hidden">
+                    <button id="start-class-confirm" class="sm:col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition shadow-md cursor-pointer text-center text-sm">
+                        🚪 全員到齊，進入正式教室
+                    </button>
+                    <button id="clear-all-data-lobby-btn" class="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-200 font-medium text-xs py-3.5 rounded-xl transition cursor-pointer text-center">
+                        🧹 重置分數歷程
+                    </button>
+                </div>
+
+                <div id="student-lobby-wait" class="text-center py-3 bg-amber-50 border border-amber-100 rounded-xl hidden animate-pulse">
+                    <p class="text-xs font-semibold text-amber-700">☕ 已成功報到！請靜待老師切換進入正式教室畫面...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main id="main-class-screen" class="max-w-6xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 hidden">
+        
+        <div class="lg:col-span-2 space-y-6">
+            
+            <div id="teacher-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 hidden">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-1.5">⚡ 題目與模式控制台</h2>
+                    <span class="text-xs bg-indigo-50 text-indigo-600 font-semibold px-2.5 py-1 rounded-md">教師端</span>
+                </div>
+
+                <div id="setup-question-box" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <button id="mode-buzz" class="py-2.5 rounded-xl font-medium border text-sm transition cursor-pointer bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs">純搶答模式</button>
+                    <button id="mode-single" class="py-2.5 rounded-xl font-medium border text-sm transition cursor-pointer border-slate-200 text-slate-600 hover:bg-slate-50">4選1選擇題</button>
+                    <button id="mode-short" class="py-2.5 rounded-xl font-medium border text-sm transition cursor-pointer border-slate-200 text-slate-600 hover:bg-slate-50">短答/問答題</button>
+                    
+                    <div class="flex items-center gap-1.5 border border-slate-200 rounded-xl px-2.5 bg-slate-50">
+                        <label class="text-xs font-bold text-slate-500 whitespace-nowrap">🪙 本題配分:</label>
+                        <select id="score-weight" class="w-full bg-transparent text-sm font-bold text-indigo-600 focus:outline-none cursor-pointer">
+                            <option value="1" selected>1 分</option>
+                            <option value="2">2 分</option>
+                            <option value="3">3 分</option>
+                            <option value="4">4 分</option>
+                            <option value="5">5 分</option>
+                            <option value="6">6 分</option>
+                            <option value="7">7 分</option>
+                            <option value="8">8 分</option>
+                            <option value="9">9 分</option>
+                            <option value="10">10 分</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="post-match-grading-box" class="bg-amber-50 rounded-xl p-4 border border-amber-100 space-y-3 hidden">
+                    <div class="text-xs font-bold text-amber-800 flex items-center gap-1">🛑 答題已截止！請設定正確答案進行全班自動加分：</div>
+                    
+                    <div id="grade-single-box" class="grid grid-cols-4 gap-2 hidden">
+                        <button data-ans="A" class="ans-set-btn py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:border-amber-500 transition cursor-pointer text-center">A</button>
+                        <button data-ans="B" class="ans-set-btn py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:border-amber-500 transition cursor-pointer text-center">B</button>
+                        <button data-ans="C" class="ans-set-btn py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:border-amber-500 transition cursor-pointer text-center">C</button>
+                        <button data-ans="D" class="ans-set-btn py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:border-amber-500 transition cursor-pointer text-center">D</button>
+                    </div>
+
+                    <div id="grade-short-box" class="hidden">
+                        <input type="text" id="correct-keyword" placeholder="輸入正確關鍵字 (多個可以用逗號隔開)" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-amber-500 font-medium">
+                    </div>
+
+                    <button id="submit-ans-trigger-scores" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-sm transition shadow-xs cursor-pointer mt-1">
+                        📊 確認答案，全班自動計分
+                    </button>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button id="start-round-btn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition shadow-sm cursor-pointer">
+                        🚀 開始新題目 / 開放作答
+                    </button>
+                    <button id="reveal-and-grade-btn" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-semibold py-3 rounded-xl transition shadow-sm cursor-pointer hidden">
+                        🛑 停止收件並翻牌 (學生端截止)
+                    </button>
+                </div>
+            </div>
+
+            <div id="student-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 hidden">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <h2 class="text-base font-bold text-slate-900">✏️ 學生作答區</h2>
+                    <span id="student-name-tag" class="text-xs bg-slate-100 text-slate-600 font-medium px-2.5 py-1 rounded-md">載入中...</span>
+                </div>
+                <div id="student-interface" class="min-h-[160px] flex flex-col justify-center items-center">
+                    <p class="text-slate-400 text-sm">等待老師開始題目...</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        ⏱️ 本題作答動態 <span id="answered-stat" class="text-xs font-normal text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">已作答: 0人</span>
+                    </h2>
+                    <span id="current-mode-badge" class="text-xs bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-sm">純搶答</span>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="text-slate-400 border-b border-slate-100">
+                                <th class="pb-2 font-medium">順序</th>
+                                <th class="pb-2 font-medium">學生姓名</th>
+                                <th class="pb-2 font-medium">作答內容</th>
+                                <th class="pb-2 font-medium text-right" id="th-action">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="response-list" class="divide-y divide-slate-50">
+                            <tr>
+                                <td colspan="4" class="py-8 text-center text-slate-400 text-xs">目前尚無作答紀錄</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-1.5">🏆 班級累計積分榜</h2>
+                    <button id="sort-leaderboard-btn" class="text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-medium px-2.5 py-1 rounded-md transition cursor-pointer">
+                        📊 排序
+                    </button>
+                </div>
+                <ol id="leaderboard" class="space-y-2 max-h-[380px] overflow-y-auto pr-1 divide-y divide-slate-50">
+                    <p class="text-slate-400 text-xs text-center py-4">尚無同學登錄積分</p>
+                </ol>
+            </div>
+        </div>
+    </main>
+
+    <div id="history-modal" class="fixed inset-0 bg-slate-950/40 backdrop-blur-md flex items-center justify-center z-[100] p-4 transition-all duration-300 opacity-0 pointer-events-none">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col border border-slate-100 scale-95 transition-all duration-300 overflow-hidden">
+            
+            <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 p-6 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
+                <div class="absolute -right-6 -top-6 text-8xl opacity-10 pointer-events-none select-none">🏆</div>
+                <div class="space-y-1 z-10">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl animate-bounce">✨</span>
+                        <h3 class="text-xl font-black tracking-tight">課堂英雄戰績回顧魔鏡</h3>
+                    </div>
+                    <p class="text-xs text-indigo-100/80 font-medium">記錄著大家揮灑汗水與智慧的結晶！老師可在此一鍵重置資料。</p>
+                </div>
+                <div class="flex items-center gap-2 z-10 self-end sm:self-center">
+                    <button id="clear-all-data-modal-btn" class="bg-white/10 hover:bg-red-500/20 border border-white/20 hover:border-red-400 text-white hover:text-red-200 font-bold text-xs px-3 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 backdrop-blur-xs">
+                        🧹 終極大清空
+                    </button>
+                    <button id="close-history-modal" class="bg-black/10 hover:bg-black/20 text-white/80 hover:text-white font-bold h-9 w-9 rounded-full transition cursor-pointer flex items-center justify-center">✕</button>
+                </div>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1 bg-slate-50/50">
+                <div class="overflow-x-auto bg-white rounded-2xl border border-slate-200 shadow-sm">
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-bold tracking-wider text-xs">
+                                <th class="p-4 w-36 text-center">🦸 英雄大名</th>
+                                <th class="p-4 w-28 text-center text-indigo-600 bg-indigo-50/30">🔥 累計總分</th>
+                                <th class="p-4">🐾 歷史作答腳印 (依新到舊排列)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="divide-y divide-slate-100 text-slate-700">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 bg-white border-t border-slate-100 flex items-center justify-between">
+                <span class="text-xs text-slate-400 font-medium hidden sm:inline">💡 小提示：卡片左上方顯示的是該題目的作答模式與搶答名次喔！</span>
+                <button id="close-history-modal-btn" class="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-6 py-3 rounded-xl transition shadow-md hover:shadow-lg cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0 text-center">
+                    關閉魔鏡
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <script>
+        // 音效模組
+        const Sound = {
+            ctx: null,
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            playStart() {
+                this.init(); const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(587.33, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(880, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 0.3);
+            },
+            playSubmit() {
+                this.init(); const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime); gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+            },
+            playStop() {
+                this.init(); const now = this.ctx.currentTime; const tones = [329.63, 392.00, 261.63];
+                tones.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(freq, now + idx * 0.25);
+                    gain.gain.setValueAtTime(0.15, now + idx * 0.25); gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.25 + 0.4);
+                    osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now + idx * 0.25); osc.stop(now + idx * 0.25 + 0.4);
+                });
+            },
+            playGrade() {
+                this.init(); const now = this.ctx.currentTime; const tones = [523.25, 659.25, 783.99, 1046.50];
+                tones.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                    gain.gain.setValueAtTime(0.1, now + idx * 0.08); gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.2);
+                    osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now + idx * 0.08); osc.stop(now + idx * 0.08 + 0.2);
+                });
+            }
+        };
+
+        // Firebase 專案設定資訊
+        const firebaseConfig = {
+            apiKey: "AIzaSyB9E_s5Y_f8rhEdusuULFR1xMqsJL7WSo8",
+            authDomain: "buzzer-15176.firebaseapp.com",
+            databaseURL: "https://buzzer-15176-default-rtdb.firebaseio.com",
+            projectId: "buzzer-15176",
+            storageBucket: "buzzer-15176.firebasestorage.app",
+            messagingSenderId: "140827507972",
+            appId: "1:140827507972:web:525b30620d77b0d3aa6451"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
+        const roomRef = database.ref('quizRoom');
+        const responsesRef = database.ref('roomResponses');
+        const scoresRef = database.ref('roomScores');
+        const onlineRef = database.ref('roomOnlineStudents');
+        const historyRef = database.ref('roomHistoryLogs');
+
+        let currentRole = 'teacher';
+        let studentName = '';
+        let selectedMode = 'buzz'; 
+        let teacherPostAnswer = ''; 
+        let roomStatus = 'lobby'; 
+        let isRevealed = false; 
+
+        // 解析 URL 決定是老師還是學生
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('role') === 'student') {
+            currentRole = 'student';
+        } else {
+            currentRole = 'teacher';
+        }
+
+        // 監聽雲端連線狀態
+        database.ref('.info/connected').on('value', (snapshot) => {
+            const statusEl = document.getElementById('connection-status');
+            if (snapshot.val() === true) {
+                statusEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 雲端連線正常';
+                statusEl.className = "text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full flex items-center gap-1.5";
+                initApp();
+            }
+        });
+
+        function initApp() {
+            roomRef.on('value', (snapshot) => {
+                const room = snapshot.val();
+                if (!room) {
+                    if (currentRole === 'teacher') {
+                        roomRef.set({ status: 'lobby', mode: 'buzz', reveal: false });
+                    }
+                    return;
+                }
+                
+                roomStatus = room.status;
+                isRevealed = room.reveal || false;
+
+                if (room.soundTrigger) {
+                    if (room.soundTrigger === 'start' && currentRole === 'teacher') Sound.playStart();
+                    if (room.soundTrigger === 'stop' && currentRole === 'teacher') Sound.playStop();
+                    if (room.soundTrigger === 'grade' && currentRole === 'teacher') Sound.playGrade();
+                }
+
+                // 核心邏輯：控制大廳畫面與正式課堂切換
+                if (roomStatus === 'lobby') {
+                    document.getElementById('lobby-screen').classList.remove('hidden');
+                    document.getElementById('main-class-screen').classList.add('hidden');
+                    document.getElementById('end-class-btn').classList.add('hidden');
+                    document.getElementById('post-match-grading-box').classList.add('hidden');
+                    
+                    if (currentRole === 'teacher') {
+                        document.getElementById('view-history-btn').classList.remove('hidden');
+                        document.getElementById('teacher-qr-view').classList.remove('hidden');
+                        document.getElementById('student-signin-view').classList.add('hidden');
+                        document.getElementById('teacher-lobby-controls').classList.remove('hidden');
+                        document.getElementById('teacher-kick-hint').classList.remove('hidden');
+                        setupLobbyQR();
+                    } else {
+                        document.getElementById('teacher-qr-view').classList.add('hidden');
+                        document.getElementById('teacher-lobby-controls').classList.add('hidden');
+                        document.getElementById('teacher-kick-hint').classList.add('hidden');
+                        
+                        // 檢查快取中是否已有完成報到的紀錄
+                        const cachedName = localStorage.getItem('smart_class_student_name');
+                        if (cachedName) {
+                            studentName = cachedName;
+                            // 檢查雲端上是否依舊存在在線列表中
+                            onlineRef.child(studentName).once('value', (s) => {
+                                if (s.exists()) {
+                                    showStudentWaitingUI();
+                                } else {
+                                    showStudentSignInUI();
+                                }
+                            });
+                        } else {
+                            showStudentSignInUI();
+                        }
+                    }
+                } else {
+                    // 進入正式教室
+                    document.getElementById('lobby-screen').classList.add('hidden');
+                    document.getElementById('main-class-screen').classList.remove('hidden');
+                    if (currentRole === 'teacher') {
+                        document.getElementById('end-class-btn').classList.remove('hidden');
+                        document.getElementById('view-history-btn').classList.remove('hidden');
+                    } else {
+                        // 學生端若尚未報到卻進入了教室，強制引導或載入名稱
+                        const cachedName = localStorage.getItem('smart_class_student_name');
+                        if (cachedName) {
+                            studentName = cachedName;
+                            document.getElementById('student-name-tag').innerText = `👤 ${studentName}`;
+                        } else {
+                            alert("您尚未登錄資訊！將為您切換回報到大廳。");
+                            roomRef.update({ status: 'lobby' });
+                        }
+                    }
+                }
+            });
+
+            if (currentRole === 'teacher') {
+                document.getElementById('teacher-panel').classList.remove('hidden');
+                document.getElementById('th-action').classList.remove('hidden');
+                setupTeacherLogic();
+                setupHistoryModalLogic();
+            } else {
+                document.getElementById('student-panel').classList.remove('hidden');
+                document.getElementById('th-action').classList.add('hidden');
+                setupStudentLogic();
+            }
+
+            listenToOnlineLobby();
+            listenToResponses();
+            listenToLeaderboard(false);
+        }
+
+        // 學生端的兩種介面切換
+        function showStudentSignInUI() {
+            document.getElementById('student-signin-view').classList.remove('hidden');
+            document.getElementById('student-lobby-wait').classList.add('hidden');
+        }
+
+        function showStudentWaitingUI() {
+            document.getElementById('student-signin-view').classList.add('hidden');
+            document.getElementById('student-lobby-wait').classList.remove('hidden');
+        }
+
+        // 生成 QR Code
+        function setupLobbyQR() {
+            const studentUrl = window.location.href.split('?')[0] + "?role=student";
+            const container = document.getElementById("lobby-qrcode");
+            if (container.children.length === 0) {
+                new QRCode(container, {
+                    text: studentUrl,
+                    width: 200,
+                    height: 200,
+                    colorDark : "#0f172a",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            }
+        }
+
+        // 學生點擊報到按鈕邏輯
+        document.getElementById('student-join-btn').onclick = function() {
+            const noInput = document.getElementById('student-input-no').value.trim();
+            const nameInput = document.getElementById('student-input-name').value.trim();
+            
+            if(!noInput || !nameInput) {
+                alert("請填寫完整的座號與姓名！");
+                return;
+            }
+            
+            // 格式化座號為兩位數
+            const formattedNo = noInput.padStart(2, '0');
+            const fullID = `${formattedNo}-${nameInput}`;
+            
+            // 將登錄資料推送到 Firebase 雲端在線列表
+            onlineRef.child(fullID).set(true).then(() => {
+                studentName = fullID;
+                localStorage.setItem('smart_class_student_name', fullID); // 存入本機快取
+                showStudentWaitingUI();
+            }).catch(err => {
+                alert("連線錯誤，請重試！");
+            });
+        };
+
+        // 監聽在線大廳名單變更
+        function listenToOnlineLobby() {
+            onlineRef.on('value
